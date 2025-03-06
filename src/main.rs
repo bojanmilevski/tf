@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::Datelike;
 use clap::Parser;
 use filetime::FileTime;
+use std::fmt::Display;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -46,13 +47,7 @@ struct Cli {
 	person: String,
 
 	#[arg(short = 'y', long, default_value = "false")]
-	dry_run: Option<bool>,
-}
-
-impl AsRef<Path> for Cli {
-	fn as_ref(&self) -> &Path {
-		&self.destination
-	}
+	dry_run: bool,
 }
 
 struct Target {
@@ -118,35 +113,42 @@ impl TryFrom<&PathBuf> for Extension {
 			.extension()
 			.ok_or(Error::Skipping(path.clone()))?
 			.to_str()
-			.ok_or(Error::Skipping(path.clone()))?;
+			.ok_or(Error::Skipping(path.clone()))?
+			.to_lowercase();
 
-		let mime = mime_guess::from_ext(extension)
-			.first()
-			.ok_or(Error::Mime(path.clone()))?
-			.to_string();
+		let mime = match extension {
+			e if e == "arw" => "image".to_string(),
+			e if e == "heic" => "image".to_string(),
+			_ => mime_guess::from_ext(&extension)
+				.first()
+				.ok_or(Error::Mime(path.clone()))?
+				.to_string(),
+		};
 
 		let extension = match mime {
 			ext if ext.starts_with("image") => Extension::Image,
 			ext if ext.starts_with("video") => Extension::Video,
-			_ => return Err(Error::Skipping(path.clone())),
+			_ => return Err(Error::Skipping(path.to_owned())),
 		};
 
 		Ok(extension)
 	}
 }
 
-impl ToString for Extension {
-	fn to_string(&self) -> String {
-		match self {
-			Extension::Video => "videos".to_owned(),
-			Extension::Image => "pictures".to_owned(),
-		}
+impl Display for Extension {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let w = match self {
+			Extension::Video => "videos",
+			Extension::Image => "pictures",
+		};
+
+		write!(f, "{}", w)
 	}
 }
 
 fn main() -> Result<()> {
 	let mut cli = Cli::parse();
-	cli.destination = std::fs::canonicalize(&cli)?;
+	cli.destination = std::fs::canonicalize(&cli.destination)?;
 
 	for item in WalkDir::new(cli.source) {
 		let item = item?;
@@ -164,15 +166,26 @@ fn main() -> Result<()> {
 			.destination
 			.join(target.extension.to_string())
 			.join(&cli.person)
-			.join(target.mtime.year)
-			.join(target.mtime.month)
-			.join(target.name);
+			.join(&target.mtime.year)
+			.join(&target.mtime.month);
 
-		if !cli.dry_run.unwrap() {
-			// TODO: move files
-		}
+		// match cli.dry_run {
+		// 	false => {
+		let dest_dir = &destination;
+		let dest_file = &destination.join(&target.name);
 
-		println!("{} -> {}", target.abs_path.display(), destination.display());
+		match std::fs::create_dir_all(dest_dir) {
+			Ok(_) => (),
+			Err(_) => println!("Directory {} already created!", &dest_dir.display()),
+		};
+
+		match std::fs::rename(&target.abs_path, dest_file) {
+			Ok(_) => println!("{} -> {}", target.abs_path.display(), dest_file.display()),
+			Err(_) => println!("File {} already exists!", &dest_file.display()),
+		};
+		// 	}
+		// 	true => (),
+		// }
 	}
 
 	Ok(())

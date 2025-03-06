@@ -1,14 +1,14 @@
-# tf
+# TF
 
-recursively transfer media files
+Recursively transfer media files.
 
-## how?
+## HOW
 
 you provide your source folder, where all of your media files are located. `tf` moves these media
 files to the provided destination folder, creating an appropriate media folder, an optional person
 folder and year and month folders - based on the mtime of the file.
 
-## example
+## EXAMPLE
 
 source: /home/user/files
 dst: /home/my_user/media
@@ -22,7 +22,7 @@ person: me
 |_ folder/
    |_ another_video.mkv         (mtime: 10.12.2009)
    |_ another_picture.jpg       (mtime: 04.05.2024)
-   |_ another_note.odt          
+   |_ another_note.odt
 ```
 
 /home/user/files/picture.png -> /home/my_user/media/pictures/me/2000/january/picture.png
